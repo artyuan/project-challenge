@@ -4,7 +4,6 @@ import pickle
 import mlflow
 from typing import List
 from typing import Tuple
-
 import pandas
 from sklearn import model_selection
 from sklearn import neighbors

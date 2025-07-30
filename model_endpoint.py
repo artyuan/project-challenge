@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 import uuid
 from datetime import datetime
-import shap
 import pandas as pd
 import pickle
 import os
