@@ -8,6 +8,12 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
+  env:
+    USER: admin
+    PASSWORD: password
+    EXPERIMENT_ID: 270823401729181343
+    RUN_ID: 93b28c54d5f14a95b573c7d2a86ddd74
     
     strategy:
       matrix:
