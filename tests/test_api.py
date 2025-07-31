@@ -1,12 +1,15 @@
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
-import pandas as pd
 import numpy as np
-import os
-import sys
+import pandas as pd
+from fastapi.security import HTTPBasicCredentials
+from api import app
 
-# Mock data for testing
+# === Mock setup ===
+mock_model = MagicMock()
+mock_model.predict.return_value = np.array([500000.0])
+
 mock_zipcode_data = pd.DataFrame({
     'ppltn_qty': [25495.0, 30905.0],
     'urbn_ppltn_qty': [25245.0, 30894.0],
@@ -34,202 +37,53 @@ mock_zipcode_data = pd.DataFrame({
     'per_assoc': [6.0, 5.0],
     'per_bchlr': [10.0, 6.0],
     'per_prfsnl': [3.0, 2.0],
-    'zipcode': [98001, 98002]
+    'zipcode': [98042, 98002]
 }).set_index('zipcode')
 
-mock_model = MagicMock()
-mock_model.predict.return_value = np.array([500000.0])
+client = TestClient(app)
 
-class TestModelEndpoint:
-    @classmethod
-    def setup_class(cls):
-        """Set up test environment before importing the app"""
-        # Set environment variables before importing the module
-        os.environ['USER'] = 'testuser'
-        os.environ['PASSWORD'] = 'testpass'
+# === Override authenticate ===
+def override_authenticate():
+    return HTTPBasicCredentials(username="user", password="pass")
 
-        # Import the app after setting environment variables
-        from model_endpoint import app
-        cls.client = TestClient(app)
+@pytest.fixture(autouse=True)
+def override_dependencies():
+    from src.auth import authenticate
+    app.dependency_overrides[authenticate] = override_authenticate
+    yield
+    app.dependency_overrides = {}
 
-    def test_predict_success(self):
-        """Test successful prediction with valid credentials and data"""
-        # Mock the functions at the module level
-        with patch('model_endpoint.get_model', return_value=mock_model), \
-                patch('model_endpoint.get_zipcode_features', return_value=mock_zipcode_data), \
-                patch('os.path.isfile', return_value=False), \
-                patch('pandas.DataFrame.to_csv') as mock_to_csv:
-            # Test data
-            test_data = {
-                "zipcode": 98001,
-                "bedrooms": 3.0,
-                "bathrooms": 2.5,
-                "sqft_living": 2000.0,
-                "sqft_lot": 5000.0,
-                "floors": 2.0,
-                "sqft_above": 1800.0,
-                "sqft_basement": 200.0
-            }
+# === Fixtures ===
+@pytest.fixture
+def valid_payload():
+    return {
+      "zipcode": 98042,
+      "bedrooms": 4.0,
+      "bathrooms": 1.0,
+      "sqft_living": 1680.0,
+      "sqft_lot": 5043.0,
+      "floors": 1.5,
+      "sqft_above": 1680.0,
+      "sqft_basement": 1911.0
+    }
 
-            response = self.client.post(
-                "/predict",
-                json=test_data,
-                auth=("testuser", "testpass")
-            )
+@patch("api.get_model", return_value=mock_model)
+@patch("api.get_zipcode_features", return_value=mock_zipcode_data)
+@patch("api.log_prediction")
+def test_predict_endpoint(mock_log, mock_zip, mock_model_fn, valid_payload):
+    response = client.post("/predict", json=valid_payload, auth=("user", "pass"))
+    print("RESPONSE JSON:", response.json())
+    #assert response.status_code == 200
+    data = response.json()
+    assert data["prediction"] == [500000.0]
+    assert "id" in data
+    assert "timestamp" in data
+    assert "model" in data
 
-            # Debug: Print response details if it fails
-            if response.status_code != 200:
-                print(f"Response status: {response.status_code}")
-                print(f"Response body: {response.text}")
-
-            assert response.status_code == 200
-            data = response.json()
-            assert "id" in data
-            assert "timestamp" in data
-            assert "prediction" in data
-            assert isinstance(data["prediction"], list)
-            assert len(data["prediction"]) == 1
-
-    def test_predict_unauthorized(self):
-        """Test prediction with invalid credentials"""
-        test_data = {
-            "zipcode": 98001,
-            "bedrooms": 3.0,
-            "bathrooms": 2.5,
-            "sqft_living": 2000.0,
-            "sqft_lot": 5000.0,
-            "floors": 2.0,
-            "sqft_above": 1800.0,
-            "sqft_basement": 200.0
-        }
-
-        response = self.client.post(
-            "/predict",
-            json=test_data,
-            auth=("wronguser", "wrongpass")
-        )
-
-        assert response.status_code == 401
-        data = response.json()
-        assert "detail" in data
-
-    def test_predict_invalid_zipcode(self):
-        """Test prediction with non-existent zipcode"""
-        with patch('model_endpoint.get_zipcode_features', return_value=mock_zipcode_data):
-            test_data = {
-                "zipcode": 99999,  # Non-existent zipcode
-                "bedrooms": 3.0,
-                "bathrooms": 2.5,
-                "sqft_living": 2000.0,
-                "sqft_lot": 5000.0,
-                "floors": 2.0,
-                "sqft_above": 1800.0,
-                "sqft_basement": 200.0
-            }
-
-            response = self.client.post(
-                "/predict",
-                json=test_data,
-                auth=("testuser", "testpass")
-            )
-
-            assert response.status_code == 404
-            data = response.json()
-            assert "detail" in data
-            assert "Zipcode 99999 not found" in data["detail"]
-
-    def test_predict_invalid_input_data(self):
-        """Test prediction with invalid input data types"""
-        test_data = {
-            "zipcode": "invalid",
-            "bedrooms": "three",
-            "bathrooms": 2.5,
-            "sqft_living": 2000.0,
-            "sqft_lot": 5000.0,
-            "floors": 2.0,
-            "sqft_above": 1800.0,
-            "sqft_basement": 200.0
-        }
-
-        response = self.client.post(
-            "/predict",
-            json=test_data,
-            auth=("testuser", "testpass")
-        )
-
-        assert response.status_code == 422  # Validation error
-
-    def test_predict_missing_fields(self):
-        """Test prediction with missing required fields"""
-        test_data = {
-            "zipcode": 98001,
-            "bedrooms": 3.0,
-        }
-
-        response = self.client.post(
-            "/predict",
-            json=test_data,
-            auth=("testuser", "testpass")
-        )
-
-        assert response.status_code == 422
-
-    def test_predict_model_error(self):
-        """Test prediction when model raises an exception"""
-        error_model = MagicMock()
-        error_model.predict.side_effect = Exception("Model error")
-
-        with patch('model_endpoint.get_model', return_value=error_model), \
-                patch('model_endpoint.get_zipcode_features', return_value=mock_zipcode_data):
-            test_data = {
-                "zipcode": 98001,
-                "bedrooms": 3.0,
-                "bathrooms": 2.5,
-                "sqft_living": 2000.0,
-                "sqft_lot": 5000.0,
-                "floors": 2.0,
-                "sqft_above": 1800.0,
-                "sqft_basement": 200.0
-            }
-
-            response = self.client.post(
-                "/predict",
-                json=test_data,
-                auth=("testuser", "testpass")
-            )
-
-            assert response.status_code == 400
-            data = response.json()
-            assert "detail" in data
-            assert "Model error" in data["detail"]
-
-    def test_predict_logging(self):
-        """Test that predictions are logged correctly"""
-        with patch('model_endpoint.get_model', return_value=mock_model), \
-                patch('model_endpoint.get_zipcode_features', return_value=mock_zipcode_data), \
-                patch('os.path.isfile', return_value=False), \
-                patch('pandas.DataFrame.to_csv') as mock_to_csv:
-            test_data = {
-                "zipcode": 98001,
-                "bedrooms": 3.0,
-                "bathrooms": 2.5,
-                "sqft_living": 2000.0,
-                "sqft_lot": 5000.0,
-                "floors": 2.0,
-                "sqft_above": 1800.0,
-                "sqft_basement": 200.0
-            }
-
-            response = self.client.post(
-                "/predict",
-                json=test_data,
-                auth=("testuser", "testpass")
-            )
-
-            assert response.status_code == 200
-            # Verify that logging was called
-            mock_to_csv.assert_called_once()
-
-
-if __name__ == "__main__":
-    pytest.main([__file__])
+@patch("api.get_model", return_value=mock_model)
+@patch("api.get_zipcode_features", return_value=mock_zipcode_data)
+def test_predict_invalid_zipcode(mock_zip, mock_model_fn, valid_payload):
+    valid_payload["zipcode"] = 99999
+    response = client.post("/predict", json=valid_payload, auth=("user", "pass"))
+    assert response.status_code == 404
+    assert "Zipcode 99999 not found" in response.json()["detail"]

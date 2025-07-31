@@ -10,6 +10,7 @@ from sklearn import neighbors
 from sklearn import pipeline
 from sklearn import preprocessing
 from sklearn import metrics
+from datetime import datetime
 
 SALES_PATH = "data/kc_house_data.csv"  # path to CSV with home sale data
 DEMOGRAPHICS_PATH = "data/kc_house_data.csv"  # path to CSV with demographics
@@ -19,7 +20,7 @@ SALES_COLUMN_SELECTION = [
     'sqft_above', 'sqft_basement', 'zipcode'
 ]
 OUTPUT_DIR = "model"  # Directory where output artifacts will be saved
-
+run_name = f"KNN_HousePrice_Run_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
 def load_data(
     sales_path: str, demographics_path: str, sales_column_selection: List[str]
@@ -64,7 +65,7 @@ def main():
 
     mlflow.set_experiment("House_Pricemlflow server --host 127.0.0.1 --port 8080")
 
-    with mlflow.start_run():
+    with mlflow.start_run(run_name=run_name):
         # Log model parameters
         mlflow.log_param("model_type", "KNeighborsRegressor")
         mlflow.log_param("n_neighbors", regressor.n_neighbors)
