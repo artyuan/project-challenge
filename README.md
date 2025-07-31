@@ -1,160 +1,128 @@
-# 🏠 House Price Prediction API
+# House Price Prediction Application
 
-A production-ready FastAPI service for predicting house prices using machine learning models and demographic data. Built with comprehensive testing, CI/CD, and best practices.
+A comprehensive machine learning application for predicting house prices. This project combines a FastAPI backend with a Streamlit frontend to provide an interactive house price prediction service.
 
-## ✨ Features
+## 🏠 Features
 
-- **🤖 ML-Powered Predictions**: Accurate house price predictions using trained machine learning models
-- **🔐 Secure Authentication**: HTTP Basic Authentication for API access control
-- **✅ Input Validation**: Robust Pydantic models for request validation
-- **🛡️ Error Handling**: Comprehensive error handling for all edge cases
-- **📊 Automatic Logging**: All predictions are logged for analysis and auditing
-- **🧪 Comprehensive Testing**: Full test suite with mocking and CI/CD integration
-- **🚀 Production Ready**: Docker support, environment configuration, and deployment ready
-
-## 🔌 API Endpoints
-
-### POST `/predict`
-Predicts house prices based on property features and zipcode demographics.
-
-**Authentication**: Required (HTTP Basic Auth)
-
-**Request Body**:
-```json
-{
-  "zipcode": 98001,
-  "bedrooms": 3.0,
-  "bathrooms": 2.5,
-  "sqft_living": 2000.0,
-  "sqft_lot": 5000.0,
-  "floors": 2.0,
-  "sqft_above": 1800.0,
-  "sqft_basement": 200.0
-}
-```
-
-**Response**:
-```json
-{
-  "id": "uuid-string",
-  "timestamp": "2024-01-01T12:00:00.000Z",
-  "prediction": [500000.0]
-}
-```
-
-**Error Responses**:
-- `401 Unauthorized`: Invalid credentials
-- `404 Not Found`: Zipcode not found in demographics data
-- `422 Validation Error`: Invalid input data
-- `400 Bad Request`: Model or processing error
+- **Interactive Web Interface**: User-friendly Streamlit dashboard for house price predictions
+- **RESTful API**: FastAPI backend with authentication for programmatic access
+- **Machine Learning Model**: K-Nearest Neighbors regressor
+- **Bulk Predictions**: Support for CSV file uploads for multiple predictions
+- **Demographic Integration**: Incorporates zipcode demographic data for enhanced predictions
+- **Model Monitoring**: Dashboard for tracking model performance and predictions
+- **Docker Support**: Containerized deployment ready
+- **MLflow Integration**: Model versioning and experiment tracking
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Python 3.9+
-- pip
-- Git
+
+- Python 3.10+
+- Docker (optional)
 
 ### Installation
 
-1. **Clone the repository**:
-```bash
-git clone <repository-url>
-cd project-challenge
-```
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd project-challenge
+   ```
 
-2. **Install dependencies**:
-```bash
-pip install -r requirements.txt
-```
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-3. **Set up environment variables**:
-```bash
-# Linux/Mac
-export USER=your_username
-export PASSWORD=your_password
+3. **Set up environment variables**
+   Create a `.env` file in the root directory:
+   ```env
+   API_USERNAME=your_username
+   API_PASSWORD=your_password
+   EXPERIMENT_ID=your_experiment_id
+   RUN_ID=your_run_id
+   ```
 
-# Windows (PowerShell)
-$env:USER="your_username"
-$env:PASSWORD="your_password"
-```
+### Running the Application
 
-4. **Create the model** (first time only):
-```bash
-python create_model.py
-```
+#### Option 1: Using Docker
 
-5. **Run the API server**:
-```bash
-uvicorn model_endpoint:app --reload --host 0.0.0.0 --port 8000
-```
-The API will be available at `http://localhost:8000`
+1. **Build the Docker image**
+   ```bash
+   docker build -t house-price-predictor .
+   ```
 
-## 📊 API Usage Examples
+2. **Run the API container**
+   ```bash
+   docker run -p 8000:8000 house-price-predictor
+   ```
 
-### Using curl
-```bash
-curl -X POST "http://localhost:8000/predict" \
-  -H "Content-Type: application/json" \
-  -u "your_username:your_password" \
-  -d '{
-    "zipcode": 98001,
-    "bedrooms": 3.0,
-    "bathrooms": 2.5,
-    "sqft_living": 2000.0,
-    "sqft_lot": 5000.0,
-    "floors": 2.0,
-    "sqft_above": 1800.0,
-    "sqft_basement": 200.0
-  }'
-```
+3. **Run the Streamlit app**
+   ```bash
+   streamlit run streamlit_app.py
+   ```
 
-### Using Python requests
+#### Option 2: Local Development
+
+1. **Start the API server**
+   ```bash
+   uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+2. **Start the Streamlit app**
+   ```bash
+   streamlit run streamlit_app.py
+   ```
+
+## 📊 Usage
+
+### Web Interface
+
+1. **Manual Input Mode**
+   - Enter property features: zipcode, bedrooms, bathrooms, square footage, etc.
+   - Click "Predict" to get instant price predictions
+   - View prediction results with confidence metrics
+
+2. **Bulk Predictions**
+   - Upload a CSV file with multiple property records
+   - Expected columns: `zipcode`, `bedrooms`, `bathrooms`, `sqft_living`, `sqft_lot`, `floors`, `sqft_above`, `sqft_basement`
+   - Get predictions for all properties in the file
+
+### API Usage
+
+#### Authentication
+The API uses HTTP Basic Authentication. Include credentials in your requests:
+
 ```python
 import requests
+from requests.auth import HTTPBasicAuth
 
 response = requests.post(
     "http://localhost:8000/predict",
-    json={
-        "zipcode": 98001,
-        "bedrooms": 3.0,
-        "bathrooms": 2.5,
-        "sqft_living": 2000.0,
-        "sqft_lot": 5000.0,
-        "floors": 2.0,
-        "sqft_above": 1800.0,
-        "sqft_basement": 200.0
-    },
-    auth=("your_username", "your_password")
+    json=input_data,
+    auth=HTTPBasicAuth("username", "password")
 )
-
-print(response.json())
 ```
 
-## 🐳 Docker Support
+#### Single Prediction
+```python
+import requests
 
-### Build and run with Docker
-```bash
-# Build the image
-docker build -t house-price-api .
+data = {
+    "zipcode": 98042,
+    "bedrooms": 4.0,
+    "bathrooms": 1.0,
+    "sqft_living": 1680.0,
+    "sqft_lot": 5043.0,
+    "floors": 1.5,
+    "sqft_above": 1680.0,
+    "sqft_basement": 1911.0
+}
 
-# Run the container
-docker run -p 8000:8000 \
-  -e USER=your_username \
-  -e PASSWORD=your_password \
-  house-price-api
+response = requests.post("http://localhost:8000/predict", json=data)
+prediction = response.json()
 ```
 
-## 📈 Performance
-
-- **Response Time**: < 100ms for typical predictions
-- **Throughput**: 1000+ requests/minute
-- **Accuracy**: Model performance metrics are available in training logs
-- **Scalability**: Stateless design supports horizontal scaling
-
-## 🔒 Security
-
-- **Authentication**: HTTP Basic Auth required for all endpoints
-- **Input Validation**: Comprehensive Pydantic validation
-- **Error Handling**: Secure error messages without data leakage
-- **Logging**: Audit trail for all predictions
+#### Bulk Predictions
+```python
+response = requests.post("http://localhost:8000/predict_full", json=data)
+```
